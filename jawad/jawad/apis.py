@@ -1,5 +1,5 @@
 import frappe
-
+import base64
 from werkzeug.wrappers import Response, Request
 import json
 
@@ -384,7 +384,7 @@ def product_list(product_id=None):
         )
 
 
-from frappe.auth import LoginManager    # pylint: disable=no-member
+from frappe.auth import LoginManager  # pylint: disable=no-member
 from frappe import _
 
 
@@ -413,3 +413,75 @@ def custom_login(usr, pwd):
     except Exception as e:
         frappe.local.response.http_status_code = 500
         return {"message": f"Error: {str(e)}"}
+
+
+import requests
+
+
+@frappe.whitelist(allow_guest=True)
+def generate_token_secure(api_key, api_secret, app_key):
+    # frappe.log_error(title='Login attempt',message=str(api_key) + str(api_secret) + str(app_key + "  "))
+    try:
+        try:
+            app_key = base64.b64decode(app_key).decode("utf-8")
+        except Exception as e:
+            return Response(
+                json.dumps(
+                    {"message": "Security Parameters are not valid", "user_count": 0}
+                ),
+                status=401,
+                mimetype="application/json",
+            )
+        clientID, clientSecret, clientUser = frappe.db.get_value(
+            "OAuth Client",
+            {"app_name": app_key},
+            ["client_id", "client_secret", "user"],
+        )
+
+        if clientID is None:
+            # return app_key
+            return Response(
+                json.dumps(
+                    {"message": "Security Parameters are not valid", "user_count": 0}
+                ),
+                status=401,
+                mimetype="application/json",
+            )
+
+        client_id = clientID  # Replace with your OAuth client ID
+        client_secret = clientSecret  # Replace with your OAuth client secret
+        url = (
+            frappe.local.conf.host_name
+            + "/api/method/frappe.integrations.oauth2.get_token"
+        )
+        payload = {
+            "username": api_key,
+            "password": api_secret,
+            "grant_type": "password",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            # "grant_type": "refresh_token"
+        }
+        files = []
+        headers = {"Content-Type": "application/json"}
+        response = requests.request("POST", url, data=payload, files=files)
+        if response.status_code == 200:
+            result_data = json.loads(response.text)
+            return Response(
+                json.dumps({"data": result_data}),
+                status=200,
+                mimetype="application/json",
+            )
+
+        else:
+            frappe.local.response.http_status_code = 401
+            return json.loads(response.text)
+
+    except Exception as e:
+        # frappe.local.response.http_status_code = 401
+        # return json.loads(response.text)
+        return Response(
+            json.dumps({"message": e, "user_count": 0}),
+            status=500,
+            mimetype="application/json",
+        )
