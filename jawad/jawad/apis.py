@@ -382,3 +382,34 @@ def product_list(product_id=None):
             status=500,
             mimetype="application/json",
         )
+
+
+from frappe.auth import LoginManager    # pylint: disable=no-member
+from frappe import _
+
+
+@frappe.whitelist(allow_guest=True)
+def custom_login(usr, pwd):
+    try:
+        login_manager = LoginManager()
+        login_manager.authenticate(usr, pwd)
+        login_manager.post_login()
+
+        user = frappe.get_doc("User", usr)
+
+        response = {
+            "message": "Login successful",
+            "sid": frappe.session.sid,
+            "user_id": user.name,
+            "full_name": user.full_name,
+            "email": user.email,
+        }
+        return response
+
+    except frappe.AuthenticationError as e:
+        frappe.local.response.http_status_code = 401
+        return {"message": str(e)}
+
+    except Exception as e:
+        frappe.local.response.http_status_code = 500
+        return {"message": f"Error: {str(e)}"}
