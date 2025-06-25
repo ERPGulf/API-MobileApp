@@ -2,9 +2,10 @@ import frappe
 import base64
 from werkzeug.wrappers import Response, Request
 import json
+from frappe.utils import now_datetime
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def categories_List():
     """
     Returns a list of all categories.
@@ -21,7 +22,7 @@ def categories_List():
     return Response(json.dumps({"data": doc}), status=200, mimetype="application/json")
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def updated_or_newly_added_items():
     """
     Returns a list of updated or newly added products and customers since a given timestamp.
@@ -79,7 +80,7 @@ def updated_or_newly_added_items():
     return Response(json.dumps(result), status=200, mimetype="application/json")
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def valid_promotion_list():
     """
     Returns a list of valid promotions.
@@ -103,7 +104,7 @@ def valid_promotion_list():
     )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def customer_list():
     """
     Returns a list of all customers.
@@ -122,7 +123,7 @@ def customer_list():
     )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def create_customer(name, phone, email):
     """
     Creates a new customer with the given name, phone, and email.
@@ -150,7 +151,7 @@ def create_customer(name, phone, email):
     )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def update_customer(name, phone):
     """
     Updates an existing customer's phone number based on name.
@@ -193,7 +194,7 @@ def update_customer(name, phone):
     )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def parse_json_field(field):
     try:
         return json.loads(field) if isinstance(field, str) else field
@@ -261,7 +262,7 @@ def post_order(customer_id, branch_id, promotion_code, total):
         )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def order_list(customer_id):
     """
     Returns a list of all orders.
@@ -290,7 +291,7 @@ def order_list(customer_id):
         )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def branches_list():
     """
     Returns a list of all branches.
@@ -311,7 +312,7 @@ def branches_list():
         )
 
 
-@frappe.whitelist(allow_guest=True)  # pylint: disable=no-member
+@frappe.whitelist()  # pylint: disable=no-member
 def product_list(product_id=None):
     """
     Returns product details (optionally filtered by product_id).
@@ -388,7 +389,7 @@ from frappe.auth import LoginManager  # pylint: disable=no-member
 from frappe import _
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def custom_login(usr, pwd):
     try:
         login_manager = LoginManager()
@@ -484,4 +485,142 @@ def generate_token_secure(api_key, api_secret, app_key):
             json.dumps({"message": e, "user_count": 0}),
             status=500,
             mimetype="application/json",
+        )
+
+
+@frappe.whitelist(allow_guest=False)
+def generate_token_secure_for_users(username, password, app_key):
+
+    # return Response(json.dumps({"message": "2222 Security Parameters are not valid" , "user_count": 0}), status=401, mimetype='application/json')
+    frappe.log_error(
+        title="Login attempt",
+        message=str(username) + "    " + str(password) + "    " + str(app_key + "  "),
+    )
+    try:
+        try:
+            app_key = base64.b64decode(app_key).decode("utf-8")
+        except Exception as e:
+            return Response(
+                json.dumps(
+                    {"message": "Security Parameters are not valid", "user_count": 0}
+                ),
+                status=401,
+                mimetype="application/json",
+            )
+        clientID, clientSecret, clientUser = frappe.db.get_value(
+            "OAuth Client",
+            {"app_name": app_key},
+            ["client_id", "client_secret", "user"],
+        )
+
+        if clientID is None:
+            # return app_key
+            return Response(
+                json.dumps(
+                    {"message": "Security Parameters are not valid", "user_count": 0}
+                ),
+                status=401,
+                mimetype="application/json",
+            )
+
+        client_id = clientID  # Replace with your OAuth client ID
+        client_secret = clientSecret  # Replace with your OAuth client secret
+        url = (
+            frappe.local.conf.host_name
+            + "/api/method/frappe.integrations.oauth2.get_token"
+        )
+        payload = {
+            "username": username,
+            "password": password,
+            "grant_type": "password",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            # "grant_type": "refresh_token"
+        }
+        files = []
+        headers = {"Content-Type": "application/json"}
+        response = requests.request("POST", url, data=payload, files=files)
+        # var = frappe.get_list("Customer", fields=["name as id", "full_name","email", "mobile_no as phone",], filters={'name': ['like', username]})
+        qid = frappe.get_list(
+            "Customer",
+            fields=[
+                "name as id",
+                "custom_full_name as  full_name",
+                "custom_mobile_number as phone",
+                "name as email",
+                "custom_qid as qid",
+            ],
+            filters={"name": ["like", username]},
+        )
+        if response.status_code == 200:
+            doc = frappe.get_doc(
+                {
+                    "doctype": "log_in details",
+                    "user": username,
+                    "time": now_datetime(),
+                }
+            ).insert(ignore_permissions=True)
+            response_data = json.loads(response.text)
+
+            result = {
+                "token": response_data,
+                "user": qid[0] if qid else {},
+                "time": str(now_datetime()),
+            }
+            return Response(
+                json.dumps({"data": result}), status=200, mimetype="application/json"
+            )
+        else:
+
+            frappe.local.response.http_status_code = 401
+            return json.loads(response.text)
+
+    except Exception as e:
+        # frappe.local.response.http_status_code = 401
+        # return json.loads(response.text)
+        return Response(
+            json.dumps({"message": e, "user_count": 0}),
+            status=500,
+            mimetype="application/json",
+        )
+
+
+def create_refresh_token(refresh_token):
+    url = (
+        frappe.local.conf.host_name + "/api/method/frappe.integrations.oauth2.get_token"
+    )
+    payload = f"grant_type=refresh_token&refresh_token={refresh_token}"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    files = []
+
+    response = requests.post(url, headers=headers, data=payload, files=files)
+
+    if response.status_code == 200:
+        try:
+
+            message_json = json.loads(response.text)
+
+            new_message = {
+                "access_token": message_json["access_token"],
+                "expires_in": message_json["expires_in"],
+                "token_type": message_json["token_type"],
+                "scope": message_json["scope"],
+                "refresh_token": message_json["refresh_token"],
+            }
+
+            return Response(
+                json.dumps({"data": new_message}),
+                status=200,
+                mimetype="application/json",
+            )
+        except json.JSONDecodeError as e:
+            return Response(
+                json.dumps({"data": f"Error decoding JSON: {e}"}),
+                status=401,
+                mimetype="application/json",
+            )
+    else:
+
+        return Response(
+            json.dumps({"data": response.text}), status=401, mimetype="application/json"
         )
