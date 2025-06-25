@@ -541,31 +541,12 @@ def generate_token_secure_for_users(username, password, app_key):
         headers = {"Content-Type": "application/json"}
         response = requests.request("POST", url, data=payload, files=files)
         # var = frappe.get_list("Customer", fields=["name as id", "full_name","email", "mobile_no as phone",], filters={'name': ['like', username]})
-        qid = frappe.get_list(
-            "Customer",
-            fields=[
-                "name as id",
-                "custom_full_name as  full_name",
-                "custom_mobile_number as phone",
-                "name as email",
-                "custom_qid as qid",
-            ],
-            filters={"name": ["like", username]},
-        )
+
         if response.status_code == 200:
-            doc = frappe.get_doc(
-                {
-                    "doctype": "log_in details",
-                    "user": username,
-                    "time": now_datetime(),
-                }
-            ).insert(ignore_permissions=True)
             response_data = json.loads(response.text)
 
             result = {
                 "token": response_data,
-                "user": qid[0] if qid else {},
-                "time": str(now_datetime()),
             }
             return Response(
                 json.dumps({"data": result}), status=200, mimetype="application/json"
@@ -585,6 +566,7 @@ def generate_token_secure_for_users(username, password, app_key):
         )
 
 
+@frappe.whitelist(allow_guest=True)
 def create_refresh_token(refresh_token):
     url = (
         frappe.local.conf.host_name + "/api/method/frappe.integrations.oauth2.get_token"
