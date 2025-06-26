@@ -12,13 +12,8 @@ def categories_List():
     """
     # noinspection PyUnresolvedReferences
     doc = frappe.db.get_all(  # pylint: disable=no-member
-        "Item Group",
-        fields=["categories.id as id", "categories.title as name"],
-        filters={"name": "Products"},
+        "Item Group", fields=["name as id ", "name"]
     )
-    for item in doc:
-        if item.get("id") is not None:
-            item["id"] = int(item["id"])
     return Response(json.dumps({"data": doc}), status=200, mimetype="application/json")
 
 
@@ -51,7 +46,7 @@ def updated_or_newly_added_items():
     for item in items:
         products.append(
             {
-                "product_id": int(item["item_code"]),  # assuming item_code is numeric
+                "product_id": item["item_code"],  # assuming item_code is numeric
                 "product_name": item["product_name"],
                 "updated_at": str(item["updated_at"]),
             }
@@ -63,7 +58,7 @@ def updated_or_newly_added_items():
         customers_list.append(
             {
                 "id": (
-                    int(customer["id"])
+                    (customer["id"])
                     if str(customer["id"]).isdigit()
                     else customer["id"]
                 ),
