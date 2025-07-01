@@ -137,6 +137,7 @@ def create_customer():
     )
 
 
+@frappe.whitelist(allow_guest=True)
 def create_item():
 
     try:
@@ -192,9 +193,9 @@ def create_item():
                 )
 
         if "subCatImg" in data:
-            item.set("media", [])
+            item.set("custom_subcatimg", [])
             for url in data.get("subCatImg", []):
-                item.append("media", {"doctype": "media", "media": url})
+                item.append("custom_subcatimg", {"doctype": "media", "media": url})
 
         item.save(ignore_permissions=True)
         message = "Item updated successfully"
@@ -255,7 +256,7 @@ def create_item():
             item.append("custom_channelcatsubcat", row)
 
         for media in media_children:
-            item.append("media", media)
+            item.append("custom_subcatimg", media)
 
         item.insert(ignore_permissions=True)
         message = "Item created successfully"
@@ -278,7 +279,7 @@ def create_item():
         "description": item.description,
         "brand": item.custom_brand_id,
         "channelCatSubCat": channel_catsubcats,
-        "media": media_urls,
+        "subcatimg": media_urls,
     }
 
     return Response(
