@@ -219,10 +219,4 @@ app_license = "mit"
 # auth_hooks = [
 # 	"jawad.auth.validate"
 # ]
-fixtures = [
-    {"dt": "Custom Field", "filters": {"module": "Jawad"}},
-    {
-        "dt": "channelCatSubCat",
-        "filters": [["parent", "=", "Item"]],
-    },
-]
+fixtures = [{"dt": "Custom Field", "filters": {"module": "Jawad"}}]
