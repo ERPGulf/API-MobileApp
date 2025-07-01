@@ -221,4 +221,8 @@ app_license = "mit"
 # ]
 fixtures = [
     {"dt": "Custom Field", "filters": {"module": "Jawad"}},
+    {
+        "dt": "channelCatSubCat",
+        "filters": [["parent", "=", "Item"]],
+    },
 ]
