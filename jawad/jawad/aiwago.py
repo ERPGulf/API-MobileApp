@@ -5,6 +5,12 @@ from werkzeug.wrappers import Response, Request
 import json
 from frappe.utils import now_datetime
 
+from frappe.model.mapper import get_mapped_doc
+from frappe.utils import now_datetime
+from werkzeug.wrappers import Response
+import frappe
+import json
+
 
 @frappe.whitelist(allow_guest=True)
 def create_customer():
@@ -139,7 +145,6 @@ def create_customer():
 
 @frappe.whitelist(allow_guest=True)
 def create_item():
-
     try:
         data = json.loads(frappe.request.data)
     except Exception as e:
@@ -160,107 +165,63 @@ def create_item():
     existing_item = frappe.db.exists("Item", {"item_code": item_code})
 
     if existing_item:
-
         item = frappe.get_doc("Item", existing_item)
-
-        field_mapping = {
-            "nameEn": "item_name",
-            "brand": "custom_brand_id",
-            "descriptionEn": "description",
-            "nameAr": "custom_name_arabic",
-            "nameHi": "custom_namehi",
-            "nameUr": "custom_nameur",
-            "descriptionAr": "custom_descriptionar",
-            "descriptionHi": "custom_descriptionhi",
-            "descriptionUr": "custom_descriptionur",
-        }
-
-        for json_key, docfield in field_mapping.items():
-            if json_key in data:
-                item.set(docfield, data.get(json_key))
-
-        if "channelCatSubCat" in data:
-            item.set("custom_channelcatsubcat", [])
-            for row in data.get("channelCatSubCat", []):
-                item.append(
-                    "custom_channelcatsubcat",
-                    {
-                        "doctype": "channelCatSubCat",
-                        "channelid": row.get("channelid"),
-                        "categoryid": row.get("categoryid"),
-                        "subcategoryid": row.get("subCategoryid"),
-                    },
-                )
-
-        if "subCatImg" in data:
-            item.set("custom_subcatimg", [])
-            for url in data.get("subCatImg", []):
-                item.append("custom_subcatimg", {"doctype": "media", "media": url})
-
-        item.save(ignore_permissions=True)
         message = "Item updated successfully"
-
     else:
-
-        channel_cat_sub_cat_children = (
-            [
-                {
-                    "doctype": "channelCatSubCat",
-                    "channelid": row.get("channelid"),
-                    "categoryid": row.get("categoryid"),
-                    "subcategoryid": row.get("subCategoryid"),
-                }
-                for row in data.get("channelCatSubCat", [])
-            ]
-            if "channelCatSubCat" in data
-            else []
-        )
-
-        media_children = (
-            [
-                {
-                    "doctype": "media",
-                    "media": url,
-                }
-                for url in data.get("subCatImg", [])
-            ]
-            if "subCatImg" in data
-            else []
-        )
-
         item = frappe.get_doc(
             {
                 "doctype": "Item",
                 "item_code": item_code,
                 "item_group": "Products",
+                "custom_company": data.get("company"),
             }
         )
-
-        field_mapping = {
-            "nameEn": "item_name",
-            "brand": "custom_brand_id",
-            "descriptionEn": "description",
-            "nameAr": "custom_name_arabic",
-            "nameHi": "custom_namehi",
-            "nameUr": "custom_nameur",
-            "descriptionAr": "custom_descriptionar",
-            "descriptionHi": "custom_descriptionhi",
-            "descriptionUr": "custom_descriptionur",
-        }
-
-        for json_key, docfield in field_mapping.items():
-            if json_key in data:
-                item.set(docfield, data.get(json_key))
-
-        for row in channel_cat_sub_cat_children:
-            item.append("custom_channelcatsubcat", row)
-
-        for media in media_children:
-            item.append("custom_subcatimg", media)
-
-        item.insert(ignore_permissions=True)
         message = "Item created successfully"
 
+    # Field mapping
+    field_mapping = {
+        "nameEn": "item_name",
+        "brand": "custom_brand_id",
+        "descriptionEn": "description",
+        "nameAr": "custom_name_arabic",
+        "nameHi": "custom_namehi",
+        "nameUr": "custom_nameur",
+        "descriptionAr": "custom_descriptionar",
+        "descriptionHi": "custom_descriptionhi",
+        "descriptionUr": "custom_descriptionur",
+    }
+
+    for json_key, docfield in field_mapping.items():
+        if json_key in data:
+            item.set(docfield, data.get(json_key))
+
+    # Channel Cat SubCat child table
+    if "channelCatSubCat" in data:
+        item.set("custom_channelcatsubcat", [])
+        for row in data.get("channelCatSubCat", []):
+            item.append(
+                "custom_channelcatsubcat",
+                {
+                    "doctype": "channelCatSubCat",
+                    "channelid": row.get("channelid"),
+                    "categoryid": row.get("categoryid"),
+                    "subcategoryid": row.get("subCategoryid"),
+                },
+            )
+
+    # SubCatImg child table
+    if "subCatImg" in data:
+        item.set("custom_subcatimg", [])
+        for url in data.get("subCatImg", []):
+            item.append("custom_subcatimg", {"doctype": "media", "media": url})
+
+    # Save item
+    if existing_item:
+        item.save(ignore_permissions=True)
+    else:
+        item.insert(ignore_permissions=True)
+
+    # Prepare response data
     channel_catsubcats = [
         {
             "channelid": row.channelid,
@@ -270,7 +231,7 @@ def create_item():
         for row in item.custom_channelcatsubcat
     ]
 
-    media_urls = [m.media for m in item.media]
+    media_urls = [m.media for m in item.custom_subcatimg]
 
     response_data = {
         "name": item.name,
@@ -396,7 +357,7 @@ def create_or_update_order():
                 "rate": item.get("price", 0),
                 "delivery_date": item.get("delivery_date", frappe.utils.nowdate()),
                 "uom": item.get("uom", "Nos"),
-                "warehouse": item.get("warehouse", "All Warehouses - erp"),
+                "warehouse": item.get("warehouse", "Stores - A"),
             }
         )
 
@@ -506,3 +467,135 @@ def create_or_update_order():
         status=200,
         mimetype="application/json",
     )
+
+
+@frappe.whitelist(allow_guest=False)
+def create_invoice():
+    try:
+        data = json.loads(frappe.request.data)
+    except Exception as e:
+        return Response(
+            json.dumps({"error": f"Invalid JSON input: {str(e)}"}),
+            status=400,
+            mimetype="application/json",
+        )
+
+    sales_order_id = data.get("sales_order")
+    if not sales_order_id:
+        return Response(
+            json.dumps({"error": "Sales Order ID is required"}),
+            status=400,
+            mimetype="application/json",
+        )
+
+    try:
+        # Map Sales Order to Sales Invoice
+        doc = get_mapped_doc(
+            "Sales Order",
+            sales_order_id,
+            {
+                "Sales Order": {
+                    "doctype": "Sales Invoice",
+                    "field_map": {
+                        "name": "sales_order",
+                        "transaction_date": "posting_date",
+                    },
+                },
+                "Sales Order Item": {
+                    "doctype": "Sales Invoice Item",
+                    "field_map": {"name": "so_detail", "parent": "sales_order"},
+                },
+            },
+            ignore_permissions=True,
+        )
+
+        doc.customer = data.get("user_id", doc.customer)
+        doc.due_date = now_datetime()
+
+        doc.insert(ignore_permissions=True)
+        response_data = {
+            "invoice_name": doc.name,
+            "customer": doc.customer,
+            "due_date": str(doc.due_date),
+            "grand_total": doc.grand_total,
+            "items": [
+                {
+                    "item_code": item.item_code,
+                    "qty": item.qty,
+                    "rate": item.rate,
+                    "amount": item.amount,
+                }
+                for item in doc.items
+            ],
+        }
+
+        return Response(
+            json.dumps(
+                {"message": "Invoice created successfully", "data": response_data}
+            ),
+            status=200,
+            mimetype="application/json",
+        )
+
+    except Exception as e:
+        frappe.log_error(message=str(e), title="Create Invoice Failed")
+        return e
+
+
+@frappe.whitelist(allow_guest=False)
+def create_brand():
+    try:
+        data = json.loads(frappe.request.data)
+    except Exception as e:
+        return Response(
+            json.dumps({"error": f"Invalid JSON input: {str(e)}"}),
+            status=400,
+            mimetype="application/json",
+        )
+
+    try:
+        doc = frappe.get_doc(
+            {
+                "doctype": "Brand",
+                "brand": data.get("brand_name"),
+                "description": data.get("brand_description", ""),
+                "brand_defaults": [
+                    {
+                        "company": row.get("company"),
+                        "default_warehouse": row.get("default_warehouse"),
+                        "default_price_list": row.get("default_price_list"),
+                    }
+                    for row in data.get("brand_defaults", [])
+                ],
+            }
+        )
+
+        doc.insert(ignore_permissions=True)
+        response_data = {
+            "brand_name": doc.name,
+            "brand_description": doc.description,
+            "brand_defaults": [
+                {
+                    "company": d.company,
+                    "default_warehouse": d.default_warehouse,
+                    "default_price_list": d.default_price_list,
+                }
+                for d in doc.brand_defaults
+            ],
+        }
+
+        return Response(
+            json.dumps(
+                {"message": "Brand created successfully", "data": response_data}
+            ),
+            status=200,
+            mimetype="application/json",
+        )
+
+    except Exception as e:
+        frappe.log_error(str(e), "Create Brand Error")
+        return Response(
+            json.dumps({"error": f"Failed to create Brand: {str(e)}"}),
+            status=500,
+            mimetype="application/json",
+        )
