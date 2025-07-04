@@ -555,6 +555,14 @@ def create_brand():
         )
 
     try:
+
+        default_company = frappe.db.get_single_value(
+            "Global Defaults", "default_company"
+        )
+        default_warehouse = frappe.db.get_value(
+            "Warehouse", {"company": default_company}, "name"
+        )
+
         doc = frappe.get_doc(
             {
                 "doctype": "Brand",
@@ -562,11 +570,9 @@ def create_brand():
                 "description": data.get("brand_description", ""),
                 "brand_defaults": [
                     {
-                        "company": row.get("company"),
-                        "default_warehouse": row.get("default_warehouse"),
-                        "default_price_list": row.get("default_price_list"),
+                        "company": default_company,
+                        "default_warehouse": default_warehouse,
                     }
-                    for row in data.get("brand_defaults", [])
                 ],
             }
         )
