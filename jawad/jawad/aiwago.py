@@ -619,6 +619,12 @@ def get_brand_list(id=None):
             order_by="creation desc",
             filters={"name": id} if id else None,
         )
+        if not brands:
+            return Response(
+                json.dumps({"error": "No brands found."}),
+                status=404,
+                mimetype="application/json",
+            )
 
         response_data = [
             {
@@ -653,7 +659,12 @@ def get_item_list(id=None):
             filters["name"] = id
 
         item_names = frappe.get_all("Item", filters=filters, pluck="name")
-
+        if not item_names:
+            return Response(
+                json.dumps({"error": "No items found."}),
+                status=404,
+                mimetype="application/json",
+            )
         items = []
         for name in item_names:
             item = frappe.get_doc("Item", name)
@@ -670,7 +681,7 @@ def get_item_list(id=None):
             media_urls = [m.media for m in item.custom_subcatimg]
 
             item_data = {
-                "name": item.name,
+                "id": item.name,
                 "item_code": item.item_code,
                 "item_name": item.item_name,
                 "description": item.description,
