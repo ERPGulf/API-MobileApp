@@ -154,10 +154,10 @@ def create_item():
             mimetype="application/json",
         )
 
-    item_code = data.get("skuCode")
+    item_code = data.get("item_code")
     if not item_code:
         return Response(
-            json.dumps({"error": "skuCode (item_code) is required."}),
+            json.dumps({"error": "item_code is required."}),
             status=400,
             mimetype="application/json",
         )
