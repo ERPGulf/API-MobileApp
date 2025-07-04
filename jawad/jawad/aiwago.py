@@ -178,7 +178,6 @@ def create_item():
         )
         message = "Item created successfully"
 
-    # Field mapping
     field_mapping = {
         "nameEn": "item_name",
         "brand": "custom_brand_id",
@@ -195,7 +194,6 @@ def create_item():
         if json_key in data:
             item.set(docfield, data.get(json_key))
 
-    # Channel Cat SubCat child table
     if "channelCatSubCat" in data:
         item.set("custom_channelcatsubcat", [])
         for row in data.get("channelCatSubCat", []):
@@ -209,19 +207,16 @@ def create_item():
                 },
             )
 
-    # SubCatImg child table
     if "subCatImg" in data:
         item.set("custom_subcatimg", [])
         for url in data.get("subCatImg", []):
             item.append("custom_subcatimg", {"doctype": "media", "media": url})
 
-    # Save item
     if existing_item:
         item.save(ignore_permissions=True)
     else:
         item.insert(ignore_permissions=True)
 
-    # Prepare response data
     channel_catsubcats = [
         {
             "channelid": row.channelid,
@@ -238,6 +233,12 @@ def create_item():
         "item_code": item.item_code,
         "item_name": item.item_name,
         "description": item.description,
+        "nameAr": item.custom_name_arabic,
+        "nameHi": item.custom_namehi,
+        "nameUr": item.custom_nameur,
+        "descriptionAr": item.custom_descriptionar,
+        "descriptionHi": item.custom_descriptionhi,
+        "descriptionUr": item.custom_descriptionur,
         "brand": item.custom_brand_id,
         "channelCatSubCat": channel_catsubcats,
         "subcatimg": media_urls,
@@ -596,6 +597,97 @@ def create_brand():
         frappe.log_error(str(e), "Create Brand Error")
         return Response(
             json.dumps({"error": f"Failed to create Brand: {str(e)}"}),
+            status=500,
+            mimetype="application/json",
+        )
+
+
+@frappe.whitelist(allow_guest=False)
+def get_brand_list(id=None):
+    try:
+        brands = frappe.get_all(
+            "Brand",
+            fields=["name", "brand", "description"],
+            order_by="creation desc",
+            filters={"name": id} if id else None,
+        )
+
+        response_data = [
+            {
+                "id": brand.name,
+                "brand_name": brand.brand,
+                "description": brand.description,
+            }
+            for brand in brands
+        ]
+
+        return Response(
+            json.dumps({"data": response_data}),
+            status=200,
+            mimetype="application/json",
+        )
+
+    except Exception as e:
+        frappe.log_error(str(e), "Brand List Error")
+        return Response(
+            json.dumps({"error": f"Failed to fetch brands: {str(e)}"}),
+            status=500,
+            mimetype="application/json",
+        )
+
+
+@frappe.whitelist(allow_guest=True)
+def get_item_list(id=None):
+    try:
+
+        filters = {}
+        if id:
+            filters["name"] = id
+
+        item_names = frappe.get_all("Item", filters=filters, pluck="name")
+
+        items = []
+        for name in item_names:
+            item = frappe.get_doc("Item", name)
+
+            channel_catsubcats = [
+                {
+                    "channelid": row.channelid,
+                    "categoryid": row.categoryid,
+                    "subcategoryid": row.subcategoryid,
+                }
+                for row in item.custom_channelcatsubcat
+            ]
+
+            media_urls = [m.media for m in item.custom_subcatimg]
+
+            item_data = {
+                "name": item.name,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "description": item.description,
+                "nameAr": item.custom_name_arabic,
+                "nameHi": item.custom_namehi,
+                "nameUr": item.custom_nameur,
+                "descriptionAr": item.custom_descriptionar,
+                "descriptionHi": item.custom_descriptionhi,
+                "descriptionUr": item.custom_descriptionur,
+                "brand": item.custom_brand_id,
+                "channelCatSubCat": channel_catsubcats,
+                "subcatimg": media_urls,
+            }
+
+            items.append(item_data)
+
+        return Response(
+            json.dumps({"data": items}),
+            status=200,
+            mimetype="application/json",
+        )
+
+    except Exception as e:
+        return Response(
+            json.dumps({"error": f"Error: {str(e)}"}),
             status=500,
             mimetype="application/json",
         )
