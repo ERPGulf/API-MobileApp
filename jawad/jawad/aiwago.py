@@ -229,6 +229,7 @@ def create_item():
     media_urls = [m.media for m in item.custom_subcatimg]
 
     response_data = {
+        "id": item.name,
         "name": item.name,
         "item_code": item.item_code,
         "item_name": item.item_name,
@@ -579,6 +580,7 @@ def create_brand():
 
         doc.insert(ignore_permissions=True)
         response_data = {
+            "id": doc.name,
             "brand_name": doc.name,
             "brand_description": doc.description,
             "brand_defaults": [
