@@ -726,7 +726,7 @@ def create_invoice():
         )
 
     try:
-        # Map Sales Order to Sales Invoice
+
         doc = get_mapped_doc(
             "Sales Order",
             sales_order_id,
