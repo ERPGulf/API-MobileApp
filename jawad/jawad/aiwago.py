@@ -52,7 +52,26 @@ def create_customer():
         fields=["name"],
         limit=1,
     )
-
+    exsisting_business_details = frappe.get_all(
+        "businessDetails",
+        filters={
+            "title": data.get("name"),
+            "vatnumber": data.get("vat_number"),
+            "crnumber": data.get("cr_number"),
+        },
+        fields=["name"],
+        limit=1,
+    )
+    if exsisting_business_details:
+        return Response(
+            json.dumps(
+                {
+                    "error": f"A business with this name and VAT/CR number already exists: {data.get('name')}"
+                }
+            ),
+            status=400,
+            mimetype="application/json",
+        )
     if existing_customer:
         return Response(
             json.dumps(

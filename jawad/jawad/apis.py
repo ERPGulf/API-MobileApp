@@ -811,3 +811,68 @@ def create_promotional_scheme():
             status=500,
             mimetype="application/json",
         )
+
+
+@frappe.whitelist(allow_guest=False)
+def create_pos_offer():
+    """
+    Creates a new POS offer.
+    """
+    try:
+        data = json.loads(frappe.request.data)
+
+        pos_offer = frappe.get_doc(
+            {
+                "doctype": "POS Offer",
+                "title": data.get("name"),
+                "description": data.get("description"),
+                "item": data.get("item"),
+                "apply_on": data.get("apply_on"),
+                "offer": data.get("promo_type"),
+                "company": data.get("company"),
+                "valid_from": data.get("valid_from"),
+                "valid_upto": data.get("valid_upto"),
+            }
+        )
+
+        for profile_table in data.get("custom_pos_profile_table", []):
+            pos_offer.append(
+                "custom_pos_profile_table",
+                {
+                    "pos_profile": profile_table.get("pos_profile"),
+                },
+            )
+        for item_table in data.get("custom_item_table", []):
+            pos_offer.append(
+                "custom_item_table",
+                {
+                    "item_code": item_table.get("item_code"),
+                    "item_name": item_table.get("uom"),
+                    "discount_type": item_table.get("qty"),
+                    "min_qty": item_table.get("rate"),
+                    "max_qty": item_table.get("amount"),
+                },
+            )
+
+        pos_offer.insert(ignore_permissions=True)
+
+        saved_offer = frappe.get_doc("POS Offer", pos_offer.name)
+
+        return Response(
+            json.dumps(
+                {
+                    "message": "POS offer created successfully",
+                    "data": saved_offer.as_dict(),
+                },
+            ),
+            status=200,
+            mimetype="application/json",
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Create POS Offer Error")
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            mimetype="application/json",
+        )
